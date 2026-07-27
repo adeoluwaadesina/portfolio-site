@@ -1,16 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <style>
-    .mark {
-      fill: none;
-      stroke: #3355ff;
-      stroke-width: 6;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-    }
+    .thin  { fill: none; stroke: #3355ff; stroke-width: 2.75; stroke-linecap: round; stroke-linejoin: round; }
+    .thick { fill: none; stroke: #3355ff; stroke-width: 8;    stroke-linecap: round; stroke-linejoin: round; }
+    .flick { fill: none; stroke: #3355ff; stroke-width: 2;    stroke-linecap: round; stroke-linejoin: round; }
+    .cross { fill: none; stroke: #3355ff; stroke-width: 4;    stroke-linecap: round; stroke-linejoin: round; }
     @media (prefers-color-scheme: dark) {
-      .mark { stroke: #7c93ff; }
+      .thin, .thick, .flick, .cross { stroke: #7c93ff; }
     }
   </style>
-  <path class="mark" d="M14,80 C18,68 26,50 31,38 C35,28 39,20 42,15 C46,23 52,40 57,58 C60,68 63,76 66,82" />
-  <path class="mark" d="M36,48 C48,36 66,34 75,45 C83,55 78,67 66,66 C57,65 53,57 61,53 C70,49 82,48 90,32" />
+  <path class="thin" d="M8,90 C18,66 28,44 39,19" />
+  <path class="thick" d="M39,19 C54,36 67,53 80,67" />
+  <path class="flick" d="M80,67 C85,74 89,80 94,85" />
+  <path class="cross" d="M16,56 C34,50 55,45 91,33" />
 </svg>
