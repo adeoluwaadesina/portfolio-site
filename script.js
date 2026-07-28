@@ -55,6 +55,17 @@ const PROJECTS = [
     tags: ["python", "mcp"],
     links: [{ label: "Repo ↗", url: "https://github.com/adeoluwaadesina/genesis-mcp" }],
   },
+  {
+    name: "lite-key-generator",
+    status: "live",
+    statusLabel: "live",
+    desc: "A minimal, single-page tool for generating high-entropy, rotatable keys and tokens — no accounts, no network calls after load, nothing persisted. Random bytes come from crypto.getRandomValues, mixed with a high-resolution timestamp and expanded via a counter-based SHA-256 hash chain, then mapped onto a chosen character set (alphanumeric, symbols, hex, or base64url) client-side.",
+    tags: ["vanilla js", "web crypto", "no-build"],
+    links: [
+      { label: "Live ↗", url: "https://lite-key-generator.vercel.app/" },
+      { label: "Repo ↗", url: "https://github.com/adeoluwaadesina/lite-key-generator" },
+    ],
+  },
 ];
 
 const MORE = [
