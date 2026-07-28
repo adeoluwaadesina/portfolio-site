@@ -102,7 +102,7 @@ function renderRegistry() {
       <p class="reg-desc">${p.desc}</p>
       <div class="reg-foot">
         <div class="tag-row">${p.tags.map((t) => `<span class="tag">${t}</span>`).join("")}</div>
-        <div class="reg-links">${p.links.map((l) => `<a class="reg-link" href="${l.url}" target="_blank" rel="noopener">${l.label}</a>`).join("")}</div>
+        <div class="reg-links">${p.links.map((l) => `<a class="reg-link" href="${l.url}" target="_blank" rel="noopener"${l.label.startsWith("Live") ? ` data-preview="${l.url}"` : ""}>${l.label}</a>`).join("")}</div>
       </div>
     </article>
   `).join("");
@@ -114,7 +114,7 @@ function renderList(id, items) {
     <li>
       <span class="mini-name">${i.name}</span>
       <span class="mini-desc">${i.desc}</span>
-      ${i.link ? `<a class="mini-link" href="${i.link}" target="_blank" rel="noopener">Live ↗</a>` : ""}
+      ${i.link ? `<a class="mini-link" href="${i.link}" target="_blank" rel="noopener" data-preview="${i.link}">Live ↗</a>` : ""}
       <span class="mini-status">${i.status}</span>
     </li>
   `).join("");
@@ -138,3 +138,85 @@ const observer = new IntersectionObserver(
   { threshold: 0.1 }
 );
 document.querySelectorAll(".reg-item").forEach((el) => observer.observe(el));
+
+// Live-link preview: hover a "Live" link to see a screenshot of the site
+// without leaving the page.
+if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+  const preview = document.createElement("div");
+  preview.className = "link-preview";
+  preview.innerHTML = `<div class="link-preview-frame"><img alt="" /></div><span class="link-preview-url"></span>`;
+  document.body.appendChild(preview);
+  const img = preview.querySelector("img");
+  const urlLabel = preview.querySelector(".link-preview-url");
+
+  let showTimer = null;
+  let activeLink = null;
+  let pollTimers = [];
+  let sessionToken = 0;
+
+  function clearPolls() {
+    pollTimers.forEach(clearTimeout);
+    pollTimers = [];
+  }
+
+  // mshots renders on demand: the first request(s) for a URL return a
+  // "generating" placeholder (occasionally a transient error), so re-request
+  // a few times with a cache-busting param until the real screenshot loads.
+  // Preload each attempt off-DOM so a failed fetch never flashes a broken
+  // image over the visible <img>.
+  function loadWithRetries(url, token) {
+    const base = `https://s.wordpress.com/mshots/v1/${encodeURIComponent(url)}?w=640&h=400`;
+    const attempt = (n) => {
+      if (token !== sessionToken) return;
+      const test = new Image();
+      const src = n === 0 ? base : `${base}&t=${Date.now()}`;
+      test.onload = () => { if (token === sessionToken) img.src = src; };
+      test.src = src;
+      if (n < 3) pollTimers.push(setTimeout(() => attempt(n + 1), 1800));
+    };
+    attempt(0);
+  }
+
+  function position(link) {
+    const rect = link.getBoundingClientRect();
+    const pw = 320;
+    let left = rect.left + rect.width / 2 - pw / 2;
+    left = Math.max(12, Math.min(left, window.innerWidth - pw - 12));
+    let top = rect.top - 12; // anchor above the link, shifted up via translateY
+    if (top < 220) top = rect.bottom + 12; // not enough room above, drop below
+    preview.style.left = `${left}px`;
+    preview.style.top = `${top}px`;
+    preview.classList.toggle("link-preview-below", top === rect.bottom + 12);
+  }
+
+  document.querySelectorAll("[data-preview]").forEach((link) => {
+    link.addEventListener("mouseenter", () => {
+      const url = link.getAttribute("data-preview");
+      activeLink = link;
+      clearTimeout(showTimer);
+      showTimer = setTimeout(() => {
+        if (activeLink !== link) return;
+        position(link);
+        urlLabel.textContent = url.replace(/^https?:\/\//, "").replace(/\/$/, "");
+        preview.classList.add("is-visible");
+        clearPolls();
+        sessionToken += 1;
+        loadWithRetries(url, sessionToken);
+      }, 250);
+    });
+    link.addEventListener("mouseleave", () => {
+      activeLink = null;
+      sessionToken += 1;
+      clearPolls();
+      clearTimeout(showTimer);
+      preview.classList.remove("is-visible");
+    });
+  });
+
+  window.addEventListener("scroll", () => {
+    activeLink = null;
+    sessionToken += 1;
+    clearPolls();
+    preview.classList.remove("is-visible");
+  }, { passive: true });
+}
