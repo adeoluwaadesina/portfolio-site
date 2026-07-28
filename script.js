@@ -151,30 +151,47 @@ if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
 
   let showTimer = null;
   let activeLink = null;
-  let pollTimers = [];
+  let hoverPollTimers = []; // only the on-demand retries for the currently-hovered link
   let sessionToken = 0;
-
-  function clearPolls() {
-    pollTimers.forEach(clearTimeout);
-    pollTimers = [];
-  }
+  const resolvedCache = new Map(); // url -> loaded screenshot src, once real
 
   // mshots renders on demand: the first request(s) for a URL return a
   // "generating" placeholder (occasionally a transient error), so re-request
   // a few times with a cache-busting param until the real screenshot loads.
   // Preload each attempt off-DOM so a failed fetch never flashes a broken
-  // image over the visible <img>.
-  function loadWithRetries(url, token) {
+  // image over the visible <img>. Every resolved src is cached by url so a
+  // link that finished preloading shows instantly on hover. `timerBag`, when
+  // given, collects this run's setTimeout ids so a hover session can cancel
+  // its own pending retries without touching unrelated (e.g. preload) ones.
+  function loadWithRetries(url, onUpdate, token, getToken, timerBag) {
     const base = `https://s.wordpress.com/mshots/v1/${encodeURIComponent(url)}?w=640&h=400`;
     const attempt = (n) => {
-      if (token !== sessionToken) return;
+      if (token !== getToken()) return;
       const test = new Image();
       const src = n === 0 ? base : `${base}&t=${Date.now()}`;
-      test.onload = () => { if (token === sessionToken) img.src = src; };
+      test.onload = () => {
+        resolvedCache.set(url, src);
+        if (token === getToken()) onUpdate(src);
+      };
       test.src = src;
-      if (n < 3) pollTimers.push(setTimeout(() => attempt(n + 1), 1800));
+      if (n < 3) {
+        const id = setTimeout(() => attempt(n + 1), 1800);
+        if (timerBag) timerBag.push(id);
+      }
     };
     attempt(0);
+  }
+
+  // Warm the cache for every preview link shortly after load, staggered so
+  // we don't fire a burst of requests at the free screenshot service at once.
+  // Preloads always run to completion (no cancellation) since they aren't
+  // tied to a hover session.
+  function preloadAll(links) {
+    links.forEach((link, i) => {
+      const url = link.getAttribute("data-preview");
+      if (resolvedCache.has(url)) return;
+      setTimeout(() => loadWithRetries(url, () => {}, "preload", () => "preload"), i * 400);
+    });
   }
 
   function position(link) {
@@ -189,7 +206,14 @@ if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
     preview.classList.toggle("link-preview-below", top === rect.bottom + 12);
   }
 
-  document.querySelectorAll("[data-preview]").forEach((link) => {
+  const previewLinks = document.querySelectorAll("[data-preview]");
+
+  function clearHoverPolls() {
+    hoverPollTimers.forEach(clearTimeout);
+    hoverPollTimers = [];
+  }
+
+  previewLinks.forEach((link) => {
     link.addEventListener("mouseenter", () => {
       const url = link.getAttribute("data-preview");
       activeLink = link;
@@ -199,15 +223,21 @@ if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
         position(link);
         urlLabel.textContent = url.replace(/^https?:\/\//, "").replace(/\/$/, "");
         preview.classList.add("is-visible");
-        clearPolls();
+        clearHoverPolls();
+        const cached = resolvedCache.get(url);
+        if (cached) {
+          img.src = cached;
+          return;
+        }
         sessionToken += 1;
-        loadWithRetries(url, sessionToken);
+        const mySession = sessionToken;
+        loadWithRetries(url, (src) => { img.src = src; }, mySession, () => sessionToken, hoverPollTimers);
       }, 250);
     });
     link.addEventListener("mouseleave", () => {
       activeLink = null;
       sessionToken += 1;
-      clearPolls();
+      clearHoverPolls();
       clearTimeout(showTimer);
       preview.classList.remove("is-visible");
     });
@@ -216,7 +246,13 @@ if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
   window.addEventListener("scroll", () => {
     activeLink = null;
     sessionToken += 1;
-    clearPolls();
+    clearHoverPolls();
     preview.classList.remove("is-visible");
   }, { passive: true });
+
+  if ("requestIdleCallback" in window) {
+    requestIdleCallback(() => preloadAll(previewLinks));
+  } else {
+    setTimeout(() => preloadAll(previewLinks), 1000);
+  }
 }
