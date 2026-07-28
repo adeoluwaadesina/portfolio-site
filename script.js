@@ -102,7 +102,7 @@ function renderRegistry() {
       <p class="reg-desc">${p.desc}</p>
       <div class="reg-foot">
         <div class="tag-row">${p.tags.map((t) => `<span class="tag">${t}</span>`).join("")}</div>
-        <div class="reg-links">${p.links.map((l) => `<a class="reg-link" href="${l.url}" target="_blank" rel="noopener">${l.label}</a>`).join("")}</div>
+        <div class="reg-links">${p.links.map((l) => `<a class="reg-link" href="${l.url}" target="_blank" rel="noopener"${l.label.startsWith("Live") ? ` data-preview="${l.url}"` : ""}>${l.label}</a>`).join("")}</div>
       </div>
     </article>
   `).join("");
@@ -114,7 +114,7 @@ function renderList(id, items) {
     <li>
       <span class="mini-name">${i.name}</span>
       <span class="mini-desc">${i.desc}</span>
-      ${i.link ? `<a class="mini-link" href="${i.link}" target="_blank" rel="noopener">Live ↗</a>` : ""}
+      ${i.link ? `<a class="mini-link" href="${i.link}" target="_blank" rel="noopener" data-preview="${i.link}">Live ↗</a>` : ""}
       <span class="mini-status">${i.status}</span>
     </li>
   `).join("");
@@ -138,3 +138,121 @@ const observer = new IntersectionObserver(
   { threshold: 0.1 }
 );
 document.querySelectorAll(".reg-item").forEach((el) => observer.observe(el));
+
+// Live-link preview: hover a "Live" link to see a screenshot of the site
+// without leaving the page.
+if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+  const preview = document.createElement("div");
+  preview.className = "link-preview";
+  preview.innerHTML = `<div class="link-preview-frame"><img alt="" /></div><span class="link-preview-url"></span>`;
+  document.body.appendChild(preview);
+  const img = preview.querySelector("img");
+  const urlLabel = preview.querySelector(".link-preview-url");
+
+  let showTimer = null;
+  let activeLink = null;
+  let hoverPollTimers = []; // only the on-demand retries for the currently-hovered link
+  let sessionToken = 0;
+  const resolvedCache = new Map(); // url -> loaded screenshot src, once real
+
+  // mshots renders on demand: the first request(s) for a URL return a
+  // "generating" placeholder (occasionally a transient error), so re-request
+  // a few times with a cache-busting param until the real screenshot loads.
+  // Preload each attempt off-DOM so a failed fetch never flashes a broken
+  // image over the visible <img>. Every resolved src is cached by url so a
+  // link that finished preloading shows instantly on hover. `timerBag`, when
+  // given, collects this run's setTimeout ids so a hover session can cancel
+  // its own pending retries without touching unrelated (e.g. preload) ones.
+  function loadWithRetries(url, onUpdate, token, getToken, timerBag) {
+    const base = `https://s.wordpress.com/mshots/v1/${encodeURIComponent(url)}?w=640&h=400`;
+    const attempt = (n) => {
+      if (token !== getToken()) return;
+      const test = new Image();
+      const src = n === 0 ? base : `${base}&t=${Date.now()}`;
+      test.onload = () => {
+        resolvedCache.set(url, src);
+        if (token === getToken()) onUpdate(src);
+      };
+      test.src = src;
+      if (n < 3) {
+        const id = setTimeout(() => attempt(n + 1), 1800);
+        if (timerBag) timerBag.push(id);
+      }
+    };
+    attempt(0);
+  }
+
+  // Warm the cache for every preview link shortly after load, staggered so
+  // we don't fire a burst of requests at the free screenshot service at once.
+  // Preloads always run to completion (no cancellation) since they aren't
+  // tied to a hover session.
+  function preloadAll(links) {
+    links.forEach((link, i) => {
+      const url = link.getAttribute("data-preview");
+      if (resolvedCache.has(url)) return;
+      setTimeout(() => loadWithRetries(url, () => {}, "preload", () => "preload"), i * 400);
+    });
+  }
+
+  function position(link) {
+    const rect = link.getBoundingClientRect();
+    const pw = 320;
+    let left = rect.left + rect.width / 2 - pw / 2;
+    left = Math.max(12, Math.min(left, window.innerWidth - pw - 12));
+    let top = rect.top - 12; // anchor above the link, shifted up via translateY
+    if (top < 220) top = rect.bottom + 12; // not enough room above, drop below
+    preview.style.left = `${left}px`;
+    preview.style.top = `${top}px`;
+    preview.classList.toggle("link-preview-below", top === rect.bottom + 12);
+  }
+
+  const previewLinks = document.querySelectorAll("[data-preview]");
+
+  function clearHoverPolls() {
+    hoverPollTimers.forEach(clearTimeout);
+    hoverPollTimers = [];
+  }
+
+  previewLinks.forEach((link) => {
+    link.addEventListener("mouseenter", () => {
+      const url = link.getAttribute("data-preview");
+      activeLink = link;
+      clearTimeout(showTimer);
+      showTimer = setTimeout(() => {
+        if (activeLink !== link) return;
+        position(link);
+        urlLabel.textContent = url.replace(/^https?:\/\//, "").replace(/\/$/, "");
+        preview.classList.add("is-visible");
+        clearHoverPolls();
+        const cached = resolvedCache.get(url);
+        if (cached) {
+          img.src = cached;
+          return;
+        }
+        sessionToken += 1;
+        const mySession = sessionToken;
+        loadWithRetries(url, (src) => { img.src = src; }, mySession, () => sessionToken, hoverPollTimers);
+      }, 250);
+    });
+    link.addEventListener("mouseleave", () => {
+      activeLink = null;
+      sessionToken += 1;
+      clearHoverPolls();
+      clearTimeout(showTimer);
+      preview.classList.remove("is-visible");
+    });
+  });
+
+  window.addEventListener("scroll", () => {
+    activeLink = null;
+    sessionToken += 1;
+    clearHoverPolls();
+    preview.classList.remove("is-visible");
+  }, { passive: true });
+
+  if ("requestIdleCallback" in window) {
+    requestIdleCallback(() => preloadAll(previewLinks));
+  } else {
+    setTimeout(() => preloadAll(previewLinks), 1000);
+  }
+}
