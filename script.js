@@ -139,20 +139,12 @@ const observer = new IntersectionObserver(
 );
 document.querySelectorAll(".reg-item").forEach((el) => observer.observe(el));
 
-// Live-link preview: hover a "Live" link to see a screenshot of the site
-// without leaving the page.
-if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
-  const preview = document.createElement("div");
-  preview.className = "link-preview";
-  preview.innerHTML = `<div class="link-preview-frame"><img alt="" /></div><span class="link-preview-url"></span>`;
-  document.body.appendChild(preview);
-  const img = preview.querySelector("img");
-  const urlLabel = preview.querySelector(".link-preview-url");
-
-  let showTimer = null;
-  let activeLink = null;
-  let hoverPollTimers = []; // only the on-demand retries for the currently-hovered link
-  let sessionToken = 0;
+// Live-link preview: see a screenshot of a project's site without leaving
+// the page. Hover-capable devices get a floating card on mouseover; touch
+// devices get a tap-to-open dropdown under the link instead, since there's
+// no hover to trigger off of.
+{
+  const previewLinks = document.querySelectorAll("[data-preview]");
   const resolvedCache = new Map(); // url -> loaded screenshot src, once real
 
   // mshots renders on demand: the first request(s) for a URL return a
@@ -160,9 +152,9 @@ if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
   // a few times with a cache-busting param until the real screenshot loads.
   // Preload each attempt off-DOM so a failed fetch never flashes a broken
   // image over the visible <img>. Every resolved src is cached by url so a
-  // link that finished preloading shows instantly on hover. `timerBag`, when
-  // given, collects this run's setTimeout ids so a hover session can cancel
-  // its own pending retries without touching unrelated (e.g. preload) ones.
+  // link that already resolved shows instantly next time. `timerBag`, when
+  // given, collects this run's setTimeout ids so a caller can cancel its own
+  // pending retries without touching unrelated (e.g. preload) ones.
   function loadWithRetries(url, onUpdate, token, getToken, timerBag) {
     const base = `https://s.wordpress.com/mshots/v1/${encodeURIComponent(url)}?w=640&h=400`;
     const attempt = (n) => {
@@ -181,6 +173,26 @@ if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
     };
     attempt(0);
   }
+
+  if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+    initHoverPreview(previewLinks, resolvedCache, loadWithRetries);
+  } else {
+    initTapPreview(previewLinks, resolvedCache, loadWithRetries);
+  }
+}
+
+function initHoverPreview(previewLinks, resolvedCache, loadWithRetries) {
+  const preview = document.createElement("div");
+  preview.className = "link-preview";
+  preview.innerHTML = `<div class="link-preview-frame"><img alt="" /></div><span class="link-preview-url"></span>`;
+  document.body.appendChild(preview);
+  const img = preview.querySelector("img");
+  const urlLabel = preview.querySelector(".link-preview-url");
+
+  let showTimer = null;
+  let activeLink = null;
+  let hoverPollTimers = []; // only the on-demand retries for the currently-hovered link
+  let sessionToken = 0;
 
   // Warm the cache for every preview link shortly after load, staggered so
   // we don't fire a burst of requests at the free screenshot service at once.
@@ -205,8 +217,6 @@ if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
     preview.style.top = `${top}px`;
     preview.classList.toggle("link-preview-below", top === rect.bottom + 12);
   }
-
-  const previewLinks = document.querySelectorAll("[data-preview]");
 
   function clearHoverPolls() {
     hoverPollTimers.forEach(clearTimeout);
@@ -255,4 +265,79 @@ if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
   } else {
     setTimeout(() => preloadAll(previewLinks), 1000);
   }
+}
+
+// Touch devices have no hover, so tapping a "Live" link opens an inline
+// dropdown under it with the screenshot and an explicit "Open" link, instead
+// of a floating hover card. Tapping the same link again (or another one)
+// closes it; only one is open at a time.
+function initTapPreview(previewLinks, resolvedCache, loadWithRetries) {
+  let openPanel = null;
+  let openLink = null;
+  let tapToken = 0;
+
+  function closeOpenPanel() {
+    if (!openPanel) return;
+    openPanel.classList.remove("is-open");
+    openLink?.setAttribute("aria-expanded", "false");
+    openPanel = null;
+    openLink = null;
+    tapToken += 1;
+  }
+
+  previewLinks.forEach((link) => {
+    link.setAttribute("aria-expanded", "false");
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (openLink === link) {
+        closeOpenPanel();
+        return;
+      }
+      const url = link.getAttribute("data-preview");
+      const container = link.closest(".reg-item") || link.closest("li");
+      if (!container) return;
+
+      closeOpenPanel();
+
+      let panel = container.querySelector(".link-preview-inline");
+      if (!panel) {
+        panel = document.createElement("div");
+        panel.className = "link-preview-inline";
+        panel.innerHTML = `
+          <div class="link-preview-frame"><img alt="" /></div>
+          <div class="link-preview-inline-foot">
+            <span class="link-preview-url"></span>
+            <a class="btn link-preview-open" target="_blank" rel="noopener">Open site ↗</a>
+          </div>
+        `;
+        container.appendChild(panel);
+      }
+
+      const img = panel.querySelector("img");
+      const urlLabel = panel.querySelector(".link-preview-url");
+      const openLinkEl = panel.querySelector(".link-preview-open");
+      urlLabel.textContent = url.replace(/^https?:\/\//, "").replace(/\/$/, "");
+      openLinkEl.href = url;
+      const cached = resolvedCache.get(url);
+      if (cached) img.src = cached;
+      else img.removeAttribute("src");
+
+      panel.classList.add("is-open");
+      link.setAttribute("aria-expanded", "true");
+      openPanel = panel;
+      openLink = link;
+
+      if (!resolvedCache.has(url)) {
+        tapToken += 1;
+        const myToken = tapToken;
+        loadWithRetries(url, (src) => { if (myToken === tapToken) img.src = src; }, myToken, () => tapToken);
+      }
+    });
+  });
+
+  document.addEventListener("click", (e) => {
+    if (openLink && !e.target.closest(".link-preview-inline") && e.target !== openLink) {
+      closeOpenPanel();
+    }
+  });
 }
