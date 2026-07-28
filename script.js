@@ -287,6 +287,9 @@ function initTapPreview(previewLinks, resolvedCache, loadWithRetries) {
 
   previewLinks.forEach((link) => {
     link.setAttribute("aria-expanded", "false");
+    // Tapping opens a preview here rather than going straight to the site,
+    // so the label shouldn't promise "Live" the way it does on hover devices.
+    link.textContent = link.textContent.replace(/^\s*\S+/, "Preview");
     link.addEventListener("click", (e) => {
       e.preventDefault();
       if (openLink === link) {
