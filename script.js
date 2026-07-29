@@ -15,7 +15,10 @@ const PROJECTS = [
     statusLabel: "live · on pypi",
     desc: "A persistent plan panel for Claude conversations — create, track, and tick off tasks without leaving the chat. Published to PyPI and syncs across devices via a hosted Wingman Cloud instance. I use it daily to run every other project on this page.",
     tags: ["python", "mcp", "sqlite"],
-    links: [{ label: "Repo ↗", url: "https://github.com/adeoluwaadesina/wingman-mcp" }],
+    links: [
+      { label: "Live ↗", url: "https://adeoluwaadesina.github.io/wingman-mcp/" },
+      { label: "Repo ↗", url: "https://github.com/adeoluwaadesina/wingman-mcp" },
+    ],
   },
   {
     name: "beat-party",
