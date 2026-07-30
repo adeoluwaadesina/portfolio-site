@@ -4,9 +4,9 @@ const PROJECTS = [
   {
     name: "trim",
     status: "live",
-    statusLabel: "pre-launch · first contract live",
+    statusLabel: "launched · first contract live",
     desc: "A platform connecting brands with the right creators, escrow-first — TRIM is the sole contracting party between brand and creator, handling discovery, milestone payments, and campaign verification. First paying contract closed and delivered (Coralpay Technology Nigeria): 4 creators, 16 pieces of content, ~28K impressions. NITDA Nigeria Startup Label certified, live on Paystack escrow.",
-    tags: ["founder", "pre-launch", "fintech-adjacent", "escrow"],
+    tags: ["founder", "launched", "fintech-adjacent", "escrow"],
     links: [{ label: "Live ↗", url: "https://www.trim-hq.com/" }],
   },
   {
@@ -21,6 +21,17 @@ const PROJECTS = [
     ],
   },
   {
+    name: "storyvive",
+    status: "progress",
+    statusLabel: "in progress",
+    desc: "Storyvive generates canon-faithful fan-fiction continuations for TV shows, books, and films — including ones that ended or were canceled in real life. It scrapes and embeds a show's Wikipedia canon (episodes, character fates, timelines) via RAG, then writes new chapters that cite the exact source excerpts they draw on, track an evolving \"story state\" (who's alive, what's unresolved) chapter to chapter, and match the work's own genre and tone.",
+    tags: ["next.js", "openai", "wikipedia api", "pgvector"],
+    links: [
+      { label: "Live ↗", url: "https://storyvive.vercel.app/" },
+      { label: "Repo ↗", url: "https://github.com/adeoluwaadesina/Storyvive-V4" },
+    ],
+  },
+  {
     name: "beat-party",
     status: "progress",
     statusLabel: "in progress",
@@ -32,12 +43,15 @@ const PROJECTS = [
     ],
   },
   {
-    name: "whistler",
-    status: "progress",
-    statusLabel: "prototype",
-    desc: "Whistle a melody, hear it as an instrument. Whistler converts pitch to notes client-side using the YIN pitch-detection algorithm — no ML, no server — then lets you layer multiple whistled takes into a full arrangement.",
-    tags: ["react", "typescript", "web audio"],
-    links: [],
+    name: "lite-key-generator",
+    status: "live",
+    statusLabel: "live",
+    desc: "A minimal, single-page tool for generating high-entropy, rotatable keys and tokens — no accounts, no network calls after load, nothing persisted. Random bytes come from crypto.getRandomValues, mixed with a high-resolution timestamp and expanded via a counter-based SHA-256 hash chain, then mapped onto a chosen character set (alphanumeric, symbols, hex, or base64url) client-side.",
+    tags: ["vanilla js", "web crypto", "no-build"],
+    links: [
+      { label: "Live ↗", url: "https://lite-key-generator.vercel.app/" },
+      { label: "Repo ↗", url: "https://github.com/adeoluwaadesina/lite-key-generator" },
+    ],
   },
   {
     name: "groundwork",
@@ -59,15 +73,12 @@ const PROJECTS = [
     links: [{ label: "Repo ↗", url: "https://github.com/adeoluwaadesina/genesis-mcp" }],
   },
   {
-    name: "lite-key-generator",
-    status: "live",
-    statusLabel: "live",
-    desc: "A minimal, single-page tool for generating high-entropy, rotatable keys and tokens — no accounts, no network calls after load, nothing persisted. Random bytes come from crypto.getRandomValues, mixed with a high-resolution timestamp and expanded via a counter-based SHA-256 hash chain, then mapped onto a chosen character set (alphanumeric, symbols, hex, or base64url) client-side.",
-    tags: ["vanilla js", "web crypto", "no-build"],
-    links: [
-      { label: "Live ↗", url: "https://lite-key-generator.vercel.app/" },
-      { label: "Repo ↗", url: "https://github.com/adeoluwaadesina/lite-key-generator" },
-    ],
+    name: "whistler",
+    status: "progress",
+    statusLabel: "prototype",
+    desc: "Whistle a melody, hear it as an instrument. Whistler converts pitch to notes client-side using the YIN pitch-detection algorithm — no ML, no server — then lets you layer multiple whistled takes into a full arrangement.",
+    tags: ["react", "typescript", "web audio"],
+    links: [],
   },
 ];
 
@@ -83,12 +94,6 @@ const MORE = [
     desc: "A Java MCP server that logs fuel purchases and checks station wallet balances straight from Claude Desktop.",
     status: "live · personal",
     link: null,
-  },
-  {
-    name: "storyvive",
-    desc: "A standalone tool that pulls the full episode list for any TV series from Wikipedia, built and tested before folding into a larger app.",
-    status: "module",
-    link: "https://storyvive.vercel.app/generate",
   },
 ];
 
